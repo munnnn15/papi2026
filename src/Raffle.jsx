@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from './supabaseClient';
 import { AudioWave, Atmosphere, PapiLogo } from './AudioAtmosphere';
 
-const ADMIN_PASSWORD = 'admin123';
+const ADMIN_PASSWORD = 'PAPI2026ADMINGOKIL';
 
 function RafflePage() {
   const [password, setPassword] = useState('');
@@ -13,6 +13,7 @@ function RafflePage() {
   const [spinning, setSpinning] = useState(false);
   const [displayCode, setDisplayCode] = useState('?');
   const [celebration, setCelebration] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const intervalRef = useRef(null);
 
   useEffect(() => {
@@ -33,7 +34,7 @@ function RafflePage() {
   async function fetchParticipants() {
     const { data, error } = await supabase
       .from('participants')
-      .select('id, full_name, phone_number, unique_code, is_winner, prize_name, is_disqualified')
+      .select('id, full_name, phone_number, unique_code, is_winner, is_disqualified')
       .order('created_at', { ascending: true });
 
     if (!error) {
@@ -45,6 +46,17 @@ function RafflePage() {
     () => participants.filter((p) => !p.is_winner && !p.is_disqualified),
     [participants],
   );
+
+  const filteredParticipants = useMemo(() => {
+    if (!searchQuery.trim()) return participants;
+    const q = searchQuery.toLowerCase();
+    return participants.filter(
+      (p) =>
+        p.full_name.toLowerCase().includes(q) ||
+        p.phone_number.includes(q) ||
+        p.unique_code.toLowerCase().includes(q),
+    );
+  }, [participants, searchQuery]);
 
   function handleLogin(e) {
     e.preventDefault();
@@ -58,7 +70,7 @@ function RafflePage() {
   }
 
   function exportToCSV() {
-    const header = ['No', 'Nama', 'No HP', 'Kode Undian', 'Status', 'Hadiah'];
+    const header = ['No', 'Nama', 'No HP', 'Kode Undian', 'Status'];
     const rows = participants.map((p, i) => {
       const status = p.is_winner
         ? 'Pemenang'
@@ -71,7 +83,6 @@ function RafflePage() {
         p.phone_number,
         p.unique_code,
         status,
-        p.prize_name || '',
       ];
     });
 
@@ -95,7 +106,6 @@ function RafflePage() {
       return;
     }
 
-    const prizeName = 'Hadiah Utama';
     const winner = eligible[Math.floor(Math.random() * eligible.length)];
 
     setSpinning(true);
@@ -121,7 +131,7 @@ function RafflePage() {
       setTimeout(async () => {
         const { error } = await supabase
           .from('participants')
-          .update({ is_winner: true, prize_name: prizeName })
+          .update({ is_winner: true })
           .eq('id', winner.id);
 
         if (error) {
@@ -130,7 +140,7 @@ function RafflePage() {
           return;
         }
 
-        setCelebration({ ...winner, prize_name: prizeName });
+        setCelebration({ ...winner });
         setSpinning(false);
         fetchParticipants();
       }, 900);
@@ -248,14 +258,9 @@ function RafflePage() {
                 <p className="text-[11px] uppercase tracking-[0.2em] text-white/40 mb-2">
                   Pemenang Terakhir
                 </p>
-                <p className="text-2xl font-bold">
-                  {winner.full_name}
-                  <span className="ml-3 text-lg text-[#ff4d4d]">
-                    {winner.unique_code}
-                  </span>
-                </p>
-                <p className="text-sm text-white/50 mt-1">
-                  Hadiah: {winner.prize_name}
+                <p className="text-2xl font-bold">{winner.full_name}</p>
+                <p className="mt-1 text-sm text-white/60 font-mono">
+                  {winner.unique_code}
                 </p>
               </div>
             )}
@@ -268,11 +273,8 @@ function RafflePage() {
                 <p className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#ffffff] to-[#ff4d4d] glow-text">
                   {celebration.full_name}
                 </p>
-                <p className="text-lg font-semibold mt-1">
+                <p className="text-lg font-semibold mt-1 font-mono">
                   {celebration.unique_code}
-                </p>
-                <p className="text-sm text-white/60 mt-1">
-                  Hadiah: {celebration.prize_name}
                 </p>
               </div>
             )}
@@ -280,7 +282,7 @@ function RafflePage() {
             <div className="bg-[#131316] border border-white/10 rounded-2xl p-5 overflow-x-auto flex-1">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-[11px] uppercase tracking-[0.2em] text-white/40">
-                  Daftar Peserta ({participants.length})
+                  Daftar Peserta ({filteredParticipants.length}/{participants.length})
                 </p>
                 <button
                   onClick={exportToCSV}
@@ -289,6 +291,13 @@ function RafflePage() {
                   Download CSV
                 </button>
               </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari nama, nomor HP, atau kode unik..."
+                className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none focus:border-white/25 transition mb-4"
+              />
               <table className="min-w-full text-sm">
                 <thead className="bg-white/[0.03]">
                   <tr className="text-left text-white/45">
@@ -299,7 +308,7 @@ function RafflePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {participants.map((p, i) => (
+                  {filteredParticipants.map((p, i) => (
                     <tr key={p.id} className="border-t border-white/5">
                       <td className="px-3 py-2 text-white/45">{i + 1}</td>
                       <td className="px-3 py-2">{p.full_name}</td>
