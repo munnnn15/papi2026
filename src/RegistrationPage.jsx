@@ -16,6 +16,7 @@ function RegistrationPage() {
   const [error, setError] = useState('');
   const [done, setDone] = useState(null);
   const [checking, setChecking] = useState(true);
+  const [agreedRules, setAgreedRules] = useState(false);
 
   useEffect(() => {
     let stored = null;
@@ -33,6 +34,11 @@ function RegistrationPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+
+    if (!agreedRules) {
+      setError('Anda harus menyetujui aturan undian terlebih dahulu.');
+      return;
+    }
 
     const name = fullName.trim();
     const phone = phoneNumber.trim();
@@ -218,6 +224,43 @@ function RegistrationPage() {
                 className="w-full px-4 py-3.5 bg-[#0a0a0a] border border-white/10 rounded-xl text-white placeholder-white/25 focus:outline-none focus:border-[#e10600] focus:ring-2 focus:ring-[#e10600]/30 transition"
               />
             </div>
+
+            <div className="bg-white/[0.03] border border-white/10 rounded-xl p-4">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-white/40 mb-3">
+                Aturan Undian
+              </p>
+              <ul className="text-sm text-white/50 space-y-2 ml-1">
+                <li className="flex gap-2">
+                  <span className="text-[#e10600] mt-0.5 shrink-0">•</span>
+                  <span>Nama yang didaftarkan <strong className="text-white/70">harus sesuai dengan KTP</strong></span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-[#e10600] mt-0.5 shrink-0">•</span>
+                  <span>Jika terdeteksi nama ganda / mendaftar lebih dari 1x, maka <strong className="text-white/70">diskualifikasi</strong></span>
+                </li>
+              </ul>
+            </div>
+
+            <label className="flex items-start gap-3 cursor-pointer select-none">
+              <div className="relative mt-0.5 shrink-0">
+                <input
+                  type="checkbox"
+                  checked={agreedRules}
+                  onChange={(e) => setAgreedRules(e.target.checked)}
+                  className="peer sr-only"
+                />
+                <div className="w-5 h-5 rounded border border-white/20 bg-[#0a0a0a] peer-checked:bg-[#e10600] peer-checked:border-[#e10600] transition flex items-center justify-center">
+                  {agreedRules && (
+                    <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </div>
+              </div>
+              <span className="text-sm text-white/50 leading-snug">
+                Saya menyetujui aturan undian di atas
+              </span>
+            </label>
 
             <button
               type="submit"

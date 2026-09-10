@@ -226,6 +226,22 @@ function RafflePage() {
           </div>
         </div>
 
+        <div className="bg-[#131316] border border-white/10 rounded-2xl p-5 mb-8">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-white/40 mb-3">
+            Aturan Undian
+          </p>
+          <ul className="text-sm text-white/50 space-y-1.5 ml-1">
+            <li className="flex gap-2">
+              <span className="text-[#e10600] mt-0.5 shrink-0">•</span>
+              <span>Nama yang didaftarkan <strong className="text-white/70">harus sesuai dengan KTP</strong></span>
+            </li>
+            <li className="flex gap-2">
+              <span className="text-[#e10600] mt-0.5 shrink-0">•</span>
+              <span>Jika terdeteksi nama ganda / mendaftar lebih dari 1x, maka <strong className="text-white/70">diskualifikasi</strong></span>
+            </li>
+          </ul>
+        </div>
+
         <div className="grid md:grid-cols-2 gap-6 mb-8">
           <div className="bg-[#131316] border border-white/10 rounded-3xl p-6 flex flex-col items-center justify-center">
             <div className="text-center mb-5">
