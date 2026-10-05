@@ -2,19 +2,31 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from './supabaseClient';
 import { AudioWave, Atmosphere, PapiLogo } from './AudioAtmosphere';
 
-const ADMIN_PASSWORD = 'PAPI2026ADMINGOKIL';
-
 function RafflePage() {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authenticated, setAuthenticated] = useState(false);
   const [participants, setParticipants] = useState([]);
   const [loadingAuth, setLoadingAuth] = useState(false);
+  const [authError, setAuthError] = useState('');
 
   const [spinning, setSpinning] = useState(false);
   const [displayCode, setDisplayCode] = useState('?');
   const [celebration, setCelebration] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const intervalRef = useRef(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthenticated(Boolean(session));
+    });
+
+    const { data: subscription } = supabase.auth.onAuthStateChange(
+      (_event, session) => setAuthenticated(Boolean(session)),
+    );
+
+    return () => subscription.subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (authenticated) {
@@ -37,8 +49,10 @@ function RafflePage() {
       .select('id, full_name, phone_number, unique_code, is_winner, is_disqualified')
       .order('created_at', { ascending: true });
 
-    if (!error) {
-      setParticipants(data);
+    if (error) {
+      setAuthError('Akun ini tidak memiliki akses ke panel undian.');
+    } else {
+      setParticipants(data ?? []);
     }
   }
 
@@ -58,15 +72,21 @@ function RafflePage() {
     );
   }, [participants, searchQuery]);
 
-  function handleLogin(e) {
+  async function handleLogin(e) {
     e.preventDefault();
     setLoadingAuth(true);
-    if (password === ADMIN_PASSWORD) {
-      setAuthenticated(true);
-    } else {
-      alert('Password salah.');
+    setAuthError('');
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setAuthError('Email atau password tidak valid.');
     }
     setLoadingAuth(false);
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    setParticipants([]);
+    setAuthError('');
   }
 
   function exportToCSV() {
@@ -129,10 +149,9 @@ function RafflePage() {
       setDisplayCode(winner.unique_code);
 
       setTimeout(async () => {
-        const { error } = await supabase
-          .from('participants')
-          .update({ is_winner: true })
-          .eq('id', winner.id);
+        const { error } = await supabase.rpc('mark_participant_winner', {
+          p_participant_id: String(winner.id),
+        });
 
         if (error) {
           alert('Gagal mengupdate pemenang: ' + error.message);
@@ -163,8 +182,22 @@ function RafflePage() {
               <p className="text-sm text-white/45 mt-2">Panel Undian · Khusus panitia</p>
             </div>
             <form onSubmit={handleLogin} className="space-y-4">
+              {authError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl">
+                  {authError}
+                </div>
+              )}
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email panitia"
+                className="w-full px-4 py-3.5 bg-[#0a0a0a] border border-white/10 rounded-xl text-white placeholder-white/25 focus:outline-none focus:border-[#e10600] focus:ring-2 focus:ring-[#e10600]/30 transition"
+              />
               <input
                 type="password"
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Masukkan password admin"
@@ -200,7 +233,7 @@ function RafflePage() {
             </p>
           </div>
           <button
-            onClick={() => setAuthenticated(false)}
+            onClick={handleLogout}
             className="text-sm text-white/50 hover:text-white transition px-4 py-2 rounded-lg border border-white/10 hover:border-white/25"
           >
             Keluar

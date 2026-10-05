@@ -4,11 +4,6 @@ import { AudioWave, Atmosphere, PapiLogo } from './AudioAtmosphere';
 
 const STORAGE_KEY = 'papi_registered';
 
-function generateUniqueCode() {
-  const num = Math.floor(1000 + Math.random() * 9000);
-  return `PAPI-${num}`;
-}
-
 function RegistrationPage() {
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -45,64 +40,27 @@ function RegistrationPage() {
 
     setLoading(true);
 
-    const { data: existing, error: checkError } = await supabase
-      .from('participants')
-      .select('full_name, unique_code')
-      .eq('phone_number', phone)
-      .maybeSingle();
-
-    if (checkError) {
-      setLoading(false);
-      setError(checkError.message);
-      return;
-    }
-
-    if (existing) {
-      setLoading(false);
-      setDone({ fullName: existing.full_name, uniqueCode: existing.unique_code });
-      try {
-        localStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({
-            fullName: existing.full_name,
-            uniqueCode: existing.unique_code,
-          }),
-        );
-      } catch {
-        /* ignore */
-      }
-      return;
-    }
-
-    const uniqueCode = generateUniqueCode();
-
-    const { data, error: dbError } = await supabase
-      .from('participants')
-      .insert([
-        {
-          full_name: name,
-          phone_number: phone,
-          unique_code: uniqueCode,
-        },
-      ])
-      .select('id, full_name, unique_code')
-      .single();
+    const { data, error: dbError } = await supabase.rpc('register_participant', {
+      p_full_name: name,
+      p_phone_number: phone,
+    });
 
     if (dbError) {
       setLoading(false);
-      if (dbError.code === '23505') {
-        setError(
-          'Nomor HP sudah terdaftar. Anda hanya dapat mendaftar satu kali.',
-        );
-      } else {
-        setError(dbError.message);
-      }
+      setError('Pendaftaran belum dapat diproses. Silakan coba lagi.');
+      return;
+    }
+
+    const registration = data?.[0];
+    if (!registration || registration.registration_status !== 'created') {
+      setLoading(false);
+      setError('Nomor HP sudah terdaftar. Anda hanya dapat mendaftar satu kali.');
       return;
     }
 
     const registered = {
-      fullName: data.full_name,
-      uniqueCode: data.unique_code,
+      fullName: registration.full_name,
+      uniqueCode: registration.unique_code,
     };
     setDone(registered);
     try {
