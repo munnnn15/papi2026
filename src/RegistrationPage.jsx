@@ -46,8 +46,15 @@ function RegistrationPage() {
     });
 
     if (dbError) {
+      console.error('Registration failed:', dbError);
       setLoading(false);
-      setError('Pendaftaran belum dapat diproses. Silakan coba lagi.');
+      if (dbError.code === '22023') {
+        setError(dbError.message);
+      } else if (dbError.code === '42501') {
+        setError('Konfigurasi registrasi belum siap. Mohon hubungi panitia.');
+      } else {
+        setError('Pendaftaran belum dapat diproses. Silakan coba lagi.');
+      }
       return;
     }
 
