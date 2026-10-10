@@ -220,7 +220,7 @@ function RafflePage() {
   const winner = participants.find((p) => p.is_winner);
 
   return (
-    <main className="min-h-screen bg-[#0a0a0a] p-6 text-white relative overflow-hidden">
+    <main className="min-h-screen bg-[#0a0a0a] p-6 text-white relative overflow-x-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(225,6,0,0.08),transparent_55%)]" />
       <div className="relative max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-8">
@@ -276,7 +276,7 @@ function RafflePage() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-6 mb-8">
-          <div className="bg-[#131316] border border-white/10 rounded-3xl p-6 flex flex-col items-center justify-center">
+          <div className="bg-[#131316] border border-white/10 rounded-3xl p-6 flex flex-col items-center justify-start self-start md:sticky md:top-6">
             <div className="text-center mb-5">
               <p className="text-[11px] uppercase tracking-[0.25em] text-white/40 mb-4">
                 {spinning ? 'Sedang mengundi...' : 'Pemenang Undian'}
