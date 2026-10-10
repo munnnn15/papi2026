@@ -58,7 +58,7 @@ function RafflePage() {
     while (true) {
       const { data, error } = await supabase
         .from('participants')
-        .select('id, full_name, phone_number, unique_code, is_winner, is_disqualified, participant_attendances(event_date)')
+        .select('id, full_name, phone_number, unique_code, is_winner, is_disqualified, created_at, winner_selected_at, participant_attendances(event_date)')
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })
         .range(from, from + PAGE_SIZE - 1);
@@ -247,7 +247,14 @@ function RafflePage() {
     );
   }
 
-  const winner = participantsForSelectedDay.find((p) => p.is_winner);
+  const winner = participantsForSelectedDay
+    .filter((participant) => participant.is_winner)
+    .reduce((latest, participant) => {
+      if (!latest) return participant;
+      const latestTime = latest.winner_selected_at ?? latest.created_at;
+      const participantTime = participant.winner_selected_at ?? participant.created_at;
+      return new Date(participantTime) > new Date(latestTime) ? participant : latest;
+    }, null);
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] p-6 text-white relative overflow-x-hidden">
