@@ -3,13 +3,31 @@ import { supabase } from './supabaseClient';
 import { AudioWave, Atmosphere, PapiLogo } from './AudioAtmosphere';
 
 const STORAGE_KEY = 'papi_registered';
+const EVENT_DATES = [
+  { value: '2026-10-10', label: '10 October 2026', shortLabel: 'Day 1' },
+  { value: '2026-10-11', label: '11 October 2026', shortLabel: 'Day 2' },
+];
+
+function getDefaultEventDate() {
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+  }).format(new Date());
+  return EVENT_DATES.some((eventDate) => eventDate.value === today)
+    ? today
+    : EVENT_DATES[0].value;
+}
+
+function formatEventDate(value) {
+  return EVENT_DATES.find((eventDate) => eventDate.value === value)?.label ?? value;
+}
 
 function RegistrationPage() {
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [done, setDone] = useState(null);
+  const [registrations, setRegistrations] = useState({});
+  const [selectedDate, setSelectedDate] = useState(getDefaultEventDate);
   const [checking, setChecking] = useState(true);
   const [agreedRules, setAgreedRules] = useState(false);
 
@@ -20,8 +38,17 @@ function RegistrationPage() {
     } catch {
       stored = null;
     }
-    if (stored && stored.uniqueCode && stored.fullName) {
-      setDone(stored);
+    if (stored?.registrations) {
+      setRegistrations(stored.registrations);
+    } else if (stored && stored.uniqueCode && stored.fullName) {
+      // Registrations made before the daily attendance feature are Day 1.
+      const migrated = { '2026-10-10': stored };
+      setRegistrations(migrated);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ registrations: migrated }));
+      } catch {
+        /* ignore */
+      }
     }
     setChecking(false);
   }, []);
@@ -43,6 +70,7 @@ function RegistrationPage() {
     const { data, error: dbError } = await supabase.rpc('register_participant', {
       p_full_name: name,
       p_phone_number: phone,
+      p_event_date: selectedDate,
     });
 
     if (dbError) {
@@ -59,19 +87,21 @@ function RegistrationPage() {
     }
 
     const registration = data?.[0];
-    if (!registration || registration.registration_status !== 'created') {
+    if (!registration) {
       setLoading(false);
-      setError('Nomor HP sudah terdaftar. Anda hanya dapat mendaftar satu kali.');
+      setError('Pendaftaran belum dapat diproses. Silakan coba lagi.');
       return;
     }
 
     const registered = {
       fullName: registration.full_name,
       uniqueCode: registration.unique_code,
+      alreadyRegistered: registration.registration_status === 'already_registered_for_day',
     };
-    setDone(registered);
+    const updatedRegistrations = { ...registrations, [selectedDate]: registered };
+    setRegistrations(updatedRegistrations);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(registered));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ registrations: updatedRegistrations }));
     } catch {
       /* ignore */
     }
@@ -80,6 +110,8 @@ function RegistrationPage() {
   if (checking) {
     return null;
   }
+
+  const done = registrations[selectedDate];
 
   if (done) {
     return (
@@ -107,10 +139,12 @@ function RegistrationPage() {
                 </svg>
               </div>
               <h1 className="text-xl font-bold text-white mb-1">
-                Registrasi Berhasil
+                {done.alreadyRegistered ? 'Sudah Terdaftar' : 'Registrasi Berhasil'}
               </h1>
               <p className="text-sm text-white/45">
-                Selamat datang di PAPI, {done.fullName}
+                {done.alreadyRegistered
+                  ? `Kehadiran Anda untuk ${formatEventDate(selectedDate)} sudah tercatat.`
+                  : `Selamat datang di PAPI, ${done.fullName}`}
               </p>
             </div>
 
@@ -133,8 +167,9 @@ function RegistrationPage() {
             </div>
           </div>
 
-          <p className="text-center text-xs text-white/30 mt-6 tracking-wide">
-            Registrasi hanya berlaku satu kali per orang.
+          <EventDatePicker selectedDate={selectedDate} onChange={setSelectedDate} />
+          <p className="text-center text-xs text-white/30 mt-5 tracking-wide">
+            Satu nomor undian dapat digunakan untuk kehadiran di kedua hari.
           </p>
         </div>
       </Atmosphere>
@@ -162,6 +197,7 @@ function RegistrationPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            <EventDatePicker selectedDate={selectedDate} onChange={setSelectedDate} />
             <div>
               <label className="block text-sm font-medium text-white/60 mb-2">
                 Nama Lengkap
@@ -242,6 +278,31 @@ function RegistrationPage() {
         </p>
       </div>
     </Atmosphere>
+  );
+}
+
+function EventDatePicker({ selectedDate, onChange }) {
+  return (
+    <div>
+      <p className="block text-sm font-medium text-white/60 mb-2">Tanggal Kehadiran</p>
+      <div className="grid grid-cols-2 gap-2">
+        {EVENT_DATES.map((eventDate) => (
+          <button
+            key={eventDate.value}
+            type="button"
+            onClick={() => onChange(eventDate.value)}
+            className={`rounded-xl border px-3 py-3 text-left transition ${
+              selectedDate === eventDate.value
+                ? 'border-[#e10600] bg-[#e10600]/15 text-white'
+                : 'border-white/10 bg-[#0a0a0a] text-white/50 hover:border-white/25 hover:text-white'
+            }`}
+          >
+            <span className="block text-xs font-semibold">{eventDate.shortLabel}</span>
+            <span className="block text-[11px] mt-0.5 opacity-70">{eventDate.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

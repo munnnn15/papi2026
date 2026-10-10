@@ -2,6 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from './supabaseClient';
 import { AudioWave, Atmosphere, PapiLogo } from './AudioAtmosphere';
 
+const DAY_FILTERS = [
+  { value: 'all', label: 'Semua Hari' },
+  { value: '2026-10-10', label: 'Day 1 · 10 Okt' },
+  { value: '2026-10-11', label: 'Day 2 · 11 Okt' },
+];
+const PAGE_SIZE = 1000;
+
 function RafflePage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,6 +21,7 @@ function RafflePage() {
   const [displayCode, setDisplayCode] = useState('?');
   const [celebration, setCelebration] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [dayFilter, setDayFilter] = useState('all');
   const intervalRef = useRef(null);
 
   useEffect(() => {
@@ -44,33 +52,55 @@ function RafflePage() {
   }, []);
 
   async function fetchParticipants() {
-    const { data, error } = await supabase
-      .from('participants')
-      .select('id, full_name, phone_number, unique_code, is_winner, is_disqualified')
-      .order('created_at', { ascending: true });
+    const allParticipants = [];
+    let from = 0;
 
-    if (error) {
-      setAuthError('Akun ini tidak memiliki akses ke panel undian.');
-    } else {
-      setParticipants(data ?? []);
+    while (true) {
+      const { data, error } = await supabase
+        .from('participants')
+        .select('id, full_name, phone_number, unique_code, is_winner, is_disqualified, participant_attendances(event_date)')
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (error) {
+        setAuthError('Akun ini tidak memiliki akses ke panel undian.');
+        return;
+      }
+
+      allParticipants.push(...(data ?? []));
+      if (!data || data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
     }
+
+    setParticipants(allParticipants);
+    setAuthError('');
   }
 
+  const participantsForSelectedDay = useMemo(() => {
+    if (dayFilter === 'all') return participants;
+    return participants.filter((participant) =>
+      participant.participant_attendances?.some(
+        (attendance) => attendance.event_date === dayFilter,
+      ),
+    );
+  }, [participants, dayFilter]);
+
   const eligible = useMemo(
-    () => participants.filter((p) => !p.is_winner && !p.is_disqualified),
-    [participants],
+    () => participantsForSelectedDay.filter((p) => !p.is_winner && !p.is_disqualified),
+    [participantsForSelectedDay],
   );
 
   const filteredParticipants = useMemo(() => {
-    if (!searchQuery.trim()) return participants;
+    if (!searchQuery.trim()) return participantsForSelectedDay;
     const q = searchQuery.toLowerCase();
-    return participants.filter(
+    return participantsForSelectedDay.filter(
       (p) =>
         p.full_name.toLowerCase().includes(q) ||
         p.phone_number.includes(q) ||
         p.unique_code.toLowerCase().includes(q),
     );
-  }, [participants, searchQuery]);
+  }, [participantsForSelectedDay, searchQuery]);
 
   async function handleLogin(e) {
     e.preventDefault();
@@ -91,7 +121,7 @@ function RafflePage() {
 
   function exportToCSV() {
     const header = ['No', 'Nama', 'No HP', 'Kode Undian', 'Status'];
-    const rows = participants.map((p, i) => {
+    const rows = filteredParticipants.map((p, i) => {
       const status = p.is_winner
         ? 'Pemenang'
         : p.is_disqualified
@@ -115,7 +145,7 @@ function RafflePage() {
     const link = document.createElement('a');
     const date = new Date().toISOString().slice(0, 10);
     link.href = url;
-    link.download = `PAPI_participants_${date}.csv`;
+    link.download = `PAPI_participants_${dayFilter}_${date}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -217,7 +247,7 @@ function RafflePage() {
     );
   }
 
-  const winner = participants.find((p) => p.is_winner);
+  const winner = participantsForSelectedDay.find((p) => p.is_winner);
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] p-6 text-white relative overflow-x-hidden">
@@ -243,7 +273,7 @@ function RafflePage() {
         <div className="grid md:grid-cols-3 gap-4 mb-8">
           <div className="bg-[#131316] border border-white/10 rounded-2xl p-5">
             <p className="text-sm text-white/45">Total Peserta</p>
-            <p className="text-3xl font-bold mt-1">{participants.length}</p>
+            <p className="text-3xl font-bold mt-1">{participantsForSelectedDay.length}</p>
           </div>
           <div className="bg-[#131316] border border-white/10 rounded-2xl p-5">
             <p className="text-sm text-white/45">Sisa Eligible</p>
@@ -254,7 +284,7 @@ function RafflePage() {
           <div className="bg-[#131316] border border-white/10 rounded-2xl p-5">
             <p className="text-sm text-white/45">Pemenang</p>
             <p className="text-3xl font-bold mt-1">
-              {participants.filter((p) => p.is_winner).length}
+              {participantsForSelectedDay.filter((p) => p.is_winner).length}
             </p>
           </div>
         </div>
@@ -273,6 +303,23 @@ function RafflePage() {
               <span>Jika terdeteksi nama ganda / mendaftar lebih dari 1x, maka <strong className="text-white/70">diskualifikasi</strong></span>
             </li>
           </ul>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-6" aria-label="Filter hari kehadiran">
+          {DAY_FILTERS.map((filter) => (
+            <button
+              key={filter.value}
+              type="button"
+              onClick={() => setDayFilter(filter.value)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium border transition ${
+                dayFilter === filter.value
+                  ? 'bg-[#e10600] border-[#e10600] text-white'
+                  : 'bg-[#131316] border-white/10 text-white/60 hover:text-white hover:border-white/25'
+              }`}
+            >
+              {filter.label}
+            </button>
+          ))}
         </div>
 
         <div className="grid md:grid-cols-2 gap-6 mb-8">
@@ -331,7 +378,7 @@ function RafflePage() {
             <div className="bg-[#131316] border border-white/10 rounded-2xl p-5 overflow-x-auto flex-1">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-[11px] uppercase tracking-[0.2em] text-white/40">
-                  Daftar Peserta ({filteredParticipants.length}/{participants.length})
+                  Daftar Peserta ({filteredParticipants.length}/{participantsForSelectedDay.length})
                 </p>
                 <button
                   onClick={exportToCSV}
