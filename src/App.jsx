@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import RegistrationPage from './RegistrationPage';
 import TicketPage from './TicketPage';
 import RafflePage from './Raffle';
+import SummaryPage from './SummaryPage';
 
 function App() {
   return (
@@ -16,6 +17,9 @@ function App() {
 
         {/* Rute khusus panitia untuk melakukan undian */}
         <Route path="/raffle" element={<RafflePage />} />
+
+        {/* Ringkasan statistik kehadiran tanpa data pribadi peserta */}
+        <Route path="/summary" element={<SummaryPage />} />
       </Routes>
     </Router>
   );
